@@ -1,13 +1,11 @@
 /**
  * Proof of concept for the 1 dimensional FDTD simulation of EM waves
  * 
- * TODO: fix compile statement
  * To compile the program:
- * gcc -Wall -O3 -march=native 1d-fdtd.c matrix.c util.c -o 1d-fdtd -lpthread -lm
+ * gcc -Wall -g -O3 -march=native 1d-fdtd-s.c matrix.c util.c -o 1d-fdtd-s -lm
  * 
  * To compile the program with different global parameters:
- * gcc -Wall -O3 -march=native 1d-fdtd.c matrix.c util.c -o 1d-fdtd -lpthread -lm -DMESH_SIZE 60 -DSOURCE_POSITION 30 -DNUM_TIMESTEPS 100 -DTIMESTEP_SAVE 20 -DCELL_SIZE 3.e8 -DX 0.01 -DPULSE_SPREAD 10
- * TODO: fix this
+ * gcc -Wall -g -O3 -march=native 1d-fdtd-s.c matrix.c util.c -o 1d-fdtd-s -lm -DMESH_SIZE 60 -DSOURCE_POSITION 30 -DNUM_TIMESTEPS 100 -DTIMESTEP_SAVE 20 -DCELL_SIZE 3.e8 -DX 0.01 -DPULSE_SPREAD 10
  * 
  * To run the program:
  *  ./1d-fdtd output.npy

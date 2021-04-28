@@ -1,14 +1,12 @@
 /**
  * Proof of concept for the 2 dimensional FDTD simulation of EM waves
  * 
- * TODO: fix compile statement
  * To compile the program:
  * gcc -Wall -g -O3 -march=native 2d-fdtd-s.c matrix.c util.c -o 2d-fdtd-s -lm
  * 
  * To compile the program with different global parameters:
- * gcc -Wall -g -O3 -march=native 2d-fdtd-s.c matrix.c util.c -o 2d-fdtd-s -lm -DMESH_SIZE 60 -DSOURCE_POSITION 30 -DNUM_TIMESTEPS 100 -DTIMESTEP_SAVE 20 -DCELL_SIZE 3.e8 -DX 0.01 -DPULSE_SPREAD 10
- * TODO: fix this
- * 
+ * gcc -Wall -g -O3 -march=native 2d-fdtd-s.c matrix.c util.c -o 2d-fdtd-s -lm -DMESH_SIZE 60 -DSOURCE_POSITION_X 30 -DSOURCE_POSITION_Y 30 -DNUM_TIMESTEPS 100 -DTIMESTEP_SAVE 20 -DCELL_SIZE 3.e8 -DZ 0.01 -DPULSE_SPREAD 10
+s * 
  * To run the program:
  *  ./2d-fdtd-s output-2d-s.npy
  */
