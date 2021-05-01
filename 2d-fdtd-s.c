@@ -22,14 +22,16 @@ s *
 
 
 #ifndef MESH_SIZE // Not supporting non-square FDTD spaces
-#define MESH_SIZE 50
+#define MESH_SIZE 100
 #endif
+/*
 #ifndef SOURCE_POSITION_X
 #define SOURCE_POSITION_X MESH_SIZE/2 // start in the middle
 #endif
 #ifndef SOURCE_POSITION_Y
 #define SOURCE_POSITION_Y MESH_SIZE/2 // start in the middle
 #endif
+*/
 #ifndef NUM_TIMESTEPS
 #define NUM_TIMESTEPS 100
 #endif
@@ -40,10 +42,10 @@ s *
 #define CELL_SIZE 3.e8
 #endif
 #ifndef DZ
-#define DZ 0.01
+#define DZ 0.1
 #endif
 #ifndef PULSE_SPREAD
-#define PULSE_SPREAD 8 // gaussian
+#define PULSE_SPREAD 20 // gaussian
 #endif
 #define DT DZ/(2.*CELL_SIZE)
 #define CC CELL_SIZE*DT/DZ
@@ -63,25 +65,28 @@ typedef struct _curl_field {
 */
 
 // FIXME: output correctly to 2d
-void save_pos(Matrix* E_field, Matrix* output, size_t output_curr_row) {
+void save_pos(Matrix* E_field, Matrix* output, size_t num_saves) {
     float* restrict E_row = E_field->data;
     float* restrict output_data = output->data;
-
+    //size_t output_current_roww = num_saves - 1;
     // the current row will be the time step
-    size_t pos = output_curr_row*MESH_SIZE*MESH_SIZE;
+    size_t pos = num_saves*MESH_SIZE*MESH_SIZE;
     //printf("%zu\n", output_curr_row+1);
     //printf("%zu\n", pos);
 
     // TODO: FIXME
     // populate the current row in the output matrix
-    for (size_t i = 0; i < MESH_SIZE*MESH_SIZE; i++)
+    for (size_t i = 0; i < MESH_SIZE*MESH_SIZE; i++, pos++)
     {   
         // TODO: remove this conditional later
-        if (E_row[i] != 0 && MESH_SIZE*MESH_SIZE%i==0) {
+        if (E_row[i] != 0) {// && MESH_SIZE*MESH_SIZE%i==0) {
             printf("%zu %g\n", pos, E_row[i]);
-        } 
+        }
+        /*if (i!=0 && (MESH_SIZE*MESH_SIZE)%i==0) {
+            printf("%zu %g\n", pos, E_row[i]);
+        }
+        }*/
         output_data[pos] = E_row[i];
-        pos++;
     }
 }
 
@@ -103,13 +108,14 @@ int main(int argc, const char* argv[]) {
     Matrix* E_field = matrix_zeros(MESH_SIZE, MESH_SIZE);
     Matrix* H_field_x = matrix_zeros(MESH_SIZE, MESH_SIZE);
     Matrix* H_field_y = matrix_zeros(MESH_SIZE, MESH_SIZE);
-    Matrix* output_matrix = matrix_zeros(MESH_SIZE*NUM_TIMESTEPS, MESH_SIZE);
+    Matrix* output_matrix = matrix_zeros(MESH_SIZE*(NUM_TIMESTEPS/TIMESTEP_SAVE), MESH_SIZE);
     
     // print out every TIMESTEP_SAVE steps
-    size_t steps_until_printout = TIMESTEP_SAVE-1;
+    size_t steps_until_printout = TIMESTEP_SAVE;
 
     // start timesteps
-    for (size_t t = 0; t < NUM_TIMESTEPS; t++) {
+    for (size_t t = 1, num_saves = 0; t <= NUM_TIMESTEPS; t++, steps_until_printout--) {
+        printf("%zu\n", steps_until_printout);
         //printf("t = %zu\n", t);
         //printf("steps until printout: %zu\n", steps_until_printout);
         // calculate the intensities of the electric field at nodes
@@ -130,15 +136,67 @@ int main(int argc, const char* argv[]) {
             //current_row_dz += MESH_SIZE;
         }
         
-        // apply source
-        float t_delta_amt = (t-(TIMESTEP_SAVE-1));
-        float t_delta_amt_p = (t_delta_amt / PULSE_SPREAD);
-        float t_delta_amt_p_squared = t_delta_amt_p * t_delta_amt_p;
         //printf("dt = %f\np = %d\n", t_delta_amt, PULSE_SPREAD);
         //printf("e^(-1/2 * (dt/p)^2) = %f\n", exp(-0.5*t_delta_amt_p_squared));
         // TODO: reduce math, move this elsewhere
-        size_t center = MESH_SIZE*MESH_SIZE/2 + MESH_SIZE/2;
-        D_field->data[center] = exp(-0.5*t_delta_amt_p_squared);
+        //size_t center = MESH_SIZE*MESH_SIZE/2 + MESH_SIZE/2;
+        /*
+        Original by Will Langford
+        pulse = exp(-0.5*(pow((t0-T)/spread,2.0)));
+        #define NX 60
+        #define NY 60
+        jc = NX/2;
+        jc = 60/2 = 30 - 20 = 10, 30 + 20 = 50
+        range is jc-20, jc + 20
+        jc = NX / 2; (world size/2)
+			for ( j = jc-20; j < jc+20; j++) {
+				// dz[1][j] = pulse;
+				dz[2][j] = pulse/20.;
+			}
+
+        */
+        float t_delta_amt = (t-(TIMESTEP_SAVE-1));
+        float t_delta_amt_p = (t_delta_amt / PULSE_SPREAD);
+        float t_delta_amt_p_squared = t_delta_amt_p * t_delta_amt_p;
+        size_t boundary_offset = MESH_SIZE/6;
+        size_t pulse_amount = exp(-0.5*t_delta_amt_p_squared);
+        // apply the source
+        for (size_t bound_index = boundary_offset; bound_index < boundary_offset*5; bound_index++) {
+            D_field->data[2*MESH_SIZE+bound_index] = pulse_amount;
+        }
+        //D_field->data[2*MESH_SIZE + dz_j] = exp(-0.5*t_delta_amt_p_squared);
+
+        // Boundary conditions
+        /* --- boundary conditions ---
+        for (size_t dz_j = 1; dz_j < MESH_SIZE; dz_j++) {
+            D_field->data[dz_j] = 0;
+            D_field->data[MESH_SIZE + dz_j] = 0;
+            D_field->data[(MESH_SIZE*(MESH_SIZE-1)) + dz_j] = 0;
+            D_field->data[(MESH_SIZE*(MESH_SIZE-2)) + dz_j] = 0;
+        }
+
+        for (size_t dz_i = 1; dz_i < MESH_SIZE; dz_i++) {
+            D_field->data[MESH_SIZE] = 0;
+            D_field->data[MESH_SIZE + dz_i] = 0;
+            D_field->data[(MESH_SIZE-1)*dz_i] = 0;
+            D_field->data[(MESH_SIZE-2)*dz_i] = 0;
+        } */
+
+        /*
+        for ( j=1; j < NY; j++) {
+            dz[0][j] = 0.0;
+            dz[1][j] = 0.0;
+            dz[NX][j] = 0.0;
+            dz[NX-1][j] = 0.0;
+        }
+        for ( i=1; i < NY; i++) {
+            dz[i][0] = 0.0;
+            dz[i][1] = 0.0;
+            dz[i][NY] = 0.0;
+            dz[i][NY-1] = 0.0;
+        }
+        */
+
 
         // Calculate electric field intensities
         // TODO: convert to 1 loop
@@ -182,16 +240,16 @@ int main(int argc, const char* argv[]) {
         }
 
         // save values at the timestep
-        if (steps_until_printout-1 == 0) {
-            printf("saving at step %zu\n", t);
-        }
-        if (steps_until_printout-- == 0) {
+        // something might be broken here
+        if (steps_until_printout == 1) {
             //printf("actual current timestep before saving: %zu\n", t);
             //printf("value being sent to save: (t+1)/TIMESTEP_SAVE = %zu/%d = %zu\n", t+1, TIMESTEP_SAVE, (t+1)/TIMESTEP_SAVE);
             // the current row is the human-readable timestep divided by the frequency of timestep saves
-            save_pos(E_field, output_matrix, (t+1)/TIMESTEP_SAVE);
+            printf("saving at step %zu\n", t);
+            save_pos(E_field, output_matrix, num_saves++);
             // reset the timestep print counter
-            steps_until_printout = TIMESTEP_SAVE - 1;
+            // will still decrement from loop def so add 1 here
+            steps_until_printout += TIMESTEP_SAVE;
         }
     }
 
