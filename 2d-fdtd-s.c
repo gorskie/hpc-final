@@ -33,19 +33,19 @@ s *
 #endif
 */
 #ifndef NUM_TIMESTEPS
-#define NUM_TIMESTEPS 100
+#define NUM_TIMESTEPS 1000
 #endif
 #ifndef TIMESTEP_SAVE
-#define TIMESTEP_SAVE 20 // 20
+#define TIMESTEP_SAVE 5 // 20 CANNOT BE < 2
 #endif
 #ifndef CELL_SIZE
-#define CELL_SIZE 3.e8
+#define CELL_SIZE 3.e2
 #endif
 #ifndef DZ
 #define DZ 0.1
 #endif
 #ifndef PULSE_SPREAD
-#define PULSE_SPREAD 20 // gaussian
+#define PULSE_SPREAD 6 // gaussian
 #endif
 #define DT DZ/(2.*CELL_SIZE)
 #define CC CELL_SIZE*DT/DZ
