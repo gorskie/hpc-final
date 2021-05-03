@@ -10,7 +10,7 @@ grid_size = (100, 100)
 m = npy.load('output-2d-s.npy')
 m = m.reshape(-1, *grid_size)
 
-x = 1000000 #  abs(m).max()
+x = abs(m).max()
 
 plt.ion()
 plt.show()
