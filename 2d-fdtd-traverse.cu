@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <cuda_runtime.h>
 
 #ifndef MESH_SIZE
 #define MESH_SIZE 60
@@ -40,9 +41,47 @@
 #define MIN(X,Y) ((X)<(Y)?(X):(Y))
 #define MAX(X,Y) ((X)>(Y)?(X):(Y))
 
+#define CHECK(call)                                                       \
+{                                                                         \
+   const cudaError_t error = call;                                        \
+   if (error != cudaSuccess)                                              \
+   {                                                                      \
+      printf("Error: %s:%d, ", __FILE__, __LINE__);                       \
+      printf("code:%d, reason: %s\n", error, cudaGetErrorString(error));  \
+      exit(1);                                                            \
+   }                                                                      \
+}
+
+__global__
+void main_device(float* ez_row, float* hy_row, float* hx_row) {
+    unsigned int ix = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned int iy = blockIdx.y * blockDim.y + threadIdx.y;
+
+    ez_row += ix*MESH_SIZE; hy_row += ix*MESH_SIZE; hx_row += ix*MESH_SIZE;
+
+    ez_row[iy] += CC*(hy_row[iy] - hy_row[iy-MESH_SIZE] - hx_row[iy] + hx_row[iy-1])
+    hx_row[iy] += CC*(ez_row[iy] - ez_row[iy+1]);
+    hy_row[iy] += CC*(ez_row[MESH_SIZE+iy] - ez_row[iy]);
+}
+
 int main() {
-	float ez[MESH_SIZE*MESH_SIZE] = {0}, hx[MESH_SIZE*MESH_SIZE] = {0}, hy[MESH_SIZE*MESH_SIZE] = {0};
+    size_t nbytes = MESH_SIZE*MESH_SIZE;
+	float ez[nbytes] = {0}, hx[nbytes] = {0}, hy[nbytes] = {0};
     float *ez_row, *hy_row, *hx_row;
+    float *d_ez_row, *d_hy_row, *d_hx_row;
+
+    CHECK(cudaMalloc(&d_ez_row, nbytes));
+    CHECK(cudaMalloc(&d_hy_row, nbytes));
+    CHECK(cudaMalloc(&d_hx_row, nbytes));
+
+    CHECK(cudaMemcpy(d_ez_row, ez_row, nbytes, cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(d_hy_row, hy_row, nbytes, cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(d_hx_row, hx_row, nbytes, cudaMemcpyHostToDevice));
+
+    const int n_block_size = 32;
+    const int m_block_size = 32;
+    dim3 grid((n + n_block_size - 1) / n_block_size, (m + m_block_size - 1) / m_block_size);
+    dim3 block(n_block_size, m_block_size);
 
 	FILE* fp = fopen("2d_data.csv", "w");
 
@@ -56,6 +95,7 @@ int main() {
                 ez_row[j] += CC*(hy_row[j] - hy_row[j-MESH_SIZE] - hx_row[j] + hx_row[j-1]);
             }
         }
+        main_device<<<grid, block>>>(d_ez_row, d_hy_row, d_hx_row);
 
         // pulse centered at PULSE_X, PULSE_Y with PULSE_WIDTH width and PULSE_SPREAD "height"
         // peaks in intentsity at T0 and decays with time
@@ -86,6 +126,10 @@ int main() {
             }
             ez_row += MESH_SIZE; hy_row += MESH_SIZE;
         }
+        CHECK(cudaMemcpy(ez_row, d_ez_row, nbytes, cudaMemcpyDeviceToHost));
+        CHECK(cudaMemcpy(hy_row, d_hy_row, nbytes, cudaMemcpyDeviceToHost));
+        CHECK(cudaMemcpy(hx_row, d_hx_row, nbytes, cudaMemcpyDeviceToHost));
+        CHECK(cudaDeviceSynchronize());
 
         /* --- MAIN FDTD LOOP --- */
         
@@ -97,5 +141,7 @@ int main() {
             fprintf(fp, "\n");
         }
     }
+    CHECK(cudaDeviceReset());
+    CHECK(cudaFree(d_ez_row)); CHECK(cudaFree(d_hy_row); CHECK(cudaFree(d_hx_row));
 	fclose(fp);
 }
