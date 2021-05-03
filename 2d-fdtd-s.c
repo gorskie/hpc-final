@@ -33,22 +33,22 @@ s *
 #endif
 */
 #ifndef NUM_TIMESTEPS
-#define NUM_TIMESTEPS 400
+#define NUM_TIMESTEPS 200
 #endif
 #ifndef TIMESTEP_SAVE
 #define TIMESTEP_SAVE 5 // 20 CANNOT BE < 2
 #endif
 #ifndef CELL_SIZE
-#define CELL_SIZE 3.e8
+#define CELL_SIZE 3.e1
 #endif
-#ifndef DZ
-#define DZ 0.01
-#endif
+//#ifndef DZ
+//#define DZ 0.01
+//#endif
 #ifndef PULSE_SPREAD
-#define PULSE_SPREAD 6 // gaussian
+#define PULSE_SPREAD 36 // gaussian
 #endif
-#define DT DZ/(2.*CELL_SIZE)
-#define CC CELL_SIZE*DT/DZ
+//#define DT DZ/(2.*CELL_SIZE)
+#define CC 0.5//CELL_SIZE*DT/DZ
 
 void save_pos(Matrix* E_field, Matrix* output, size_t num_saves) {
     float* restrict E_row = E_field->data;
@@ -64,6 +64,9 @@ void save_pos(Matrix* E_field, Matrix* output, size_t num_saves) {
     for (size_t i = 0; i < MESH_SIZE*MESH_SIZE; i++, pos++)
     {   
         // TODO: remove this conditional later
+        if (!isfinite(E_row[i])) {
+            printf("%f\n", E_row[i]);
+        }
         if (E_row[i] != 0) {// && MESH_SIZE*MESH_SIZE%i==0) {
             printf("%zu %g\n", pos, E_row[i]);
         }
@@ -111,14 +114,27 @@ int main(int argc, const char* argv[]) {
 			}
         */
         size_t index;
+        // TODO: convert to one loop
         for (size_t i = 1; i < MESH_SIZE; i++) {
             for (size_t j = 1; j < MESH_SIZE; j++) {
                 //index = (i-1)*MESH_SIZE+(j-1); 
                 index = i*MESH_SIZE+j;
+                // TODO: change order in which do math
                 D_field->data[index] = D_field->data[index] + 0.5*
-                    (H_field_y->data[index-MESH_SIZE] - H_field_y->data[index] - H_field_x->data[index] + H_field_x->data[index-1]);
+                    (H_field_y->data[index-MESH_SIZE] - H_field_y->data[index] + (H_field_x->data[index-1] - H_field_x->data[index]));
+                if (!isfinite(D_field->data[index])) { printf("%f %f %f %f %f\n", D_field->data[index],
+                H_field_y->data[index-MESH_SIZE], H_field_y->data[index], H_field_x->data[index], H_field_x->data[index-1]); 
+                if (isnan(D_field->data[index])) {
+                    return 0;
+                }
+                }
             }
         }
+        /*
+        for (size_t i = 1; i < MESH_SIZE; i++) {
+            D_field->data[i] = D_field->data[i] + 0.5*(H_field_y->data[]);
+        }
+        */
         /*
         // calculate D field
         size_t prev_row_dz = 0;
@@ -154,14 +170,19 @@ int main(int argc, const char* argv[]) {
         float t_delta_amt = TIMESTEP_SAVE-t;
         float t_delta_amt_p = (t_delta_amt / PULSE_SPREAD);
         float t_delta_amt_p_squared = t_delta_amt_p * t_delta_amt_p;
-        size_t boundary_offset = MESH_SIZE/2;
-        size_t pulse_amount = exp(-0.5*t_delta_amt_p_squared);
+        size_t boundary_offset = MESH_SIZE/6; // MESH_SIZE/6;
+        float pulse_amount = exp(-0.5*t_delta_amt_p_squared);
+        if (!isfinite(pulse_amount)) {
+            printf("%f\n", pulse_amount);
+            return 0;
+        }
         /*for (size_t j = MESH_SIZE/6; j < 5*MESH_SIZE/6; j++) {
             D_field->data[MESH_SIZE+j] = pulse_amount/20;
         }
         */
-        // apply the source
-        // this one works but not what i expect
+        // Apply the source
+        // this one works but isn't exactly what i expect
+        // TODO: confirm correctness with jeff
         for (size_t bound_index = boundary_offset; bound_index < boundary_offset*5; bound_index++) {
             D_field->data[2*MESH_SIZE+bound_index] = pulse_amount;
         }
@@ -189,6 +210,7 @@ int main(int argc, const char* argv[]) {
         }
 
         Ours
+        (Something not working)
         for (size_t dz_j = 1; dz_j < MESH_SIZE; dz_j++) {
             //D_field->data[dz_j] = 0;
             //D_field->data[MESH_SIZE + dz_j] = 0;
@@ -215,7 +237,7 @@ int main(int argc, const char* argv[]) {
             for (size_t ex_j = 1; ex_j < MESH_SIZE; ex_j++, index_ex++) {
                 // Not sure why this 1 needs to be here
                 // TODO: determine if can remove without affecting output
-                E_field->data[index_ex] = 1*D_field->data[index_ex];
+                E_field->data[index_ex] = D_field->data[index_ex];
             }
         }
 
@@ -229,7 +251,26 @@ int main(int argc, const char* argv[]) {
                 H_field_x->data[index_hx] = H_field_x->data[index_hx] + CC*(E_field->data[index_hx] - E_field->data[index_hx+1]);
             }
         }
+        /*
+        // Converted to one loop
+        for (size_t hx_i = 0; hx_i < MESH_SIZE-1; hx_i++) {
+            H_field_x->data[hx_i] = H_field_x->data[hx_i] + CC*(E_field->data[hx_i] - E_field->data[hx_i+1]);
+        }
+        */
 
+        /*
+        for ( j=0; j < NY-1; j++) {
+				for ( i=0; i < NX-1; i++) {
+					hx[i][j] = hx[i][j] + 0.5*(ez[i][j] - ez[i][j+1]);
+ 				}
+			}
+
+			for ( j=0; j < NY-1; j++) {
+				for ( i=0; i < NX-1; i++) {
+					hy[i][j] = hy[i][j] + 0.5*(ez[i+1][j] - ez[i][j]);
+				}
+			}
+        */
         // Calculate magnetic field in the Y
         size_t current_row_hy = 0;
         size_t next_row_hy = MESH_SIZE;
@@ -244,13 +285,11 @@ int main(int argc, const char* argv[]) {
         }
 
         // save values at the timestep
-        // something might be broken here
         if (steps_until_printout == 1) {
-            // the current row is the human-readable timestep divided by the frequency of timestep saves
-            printf("saving at step %zu\n", t);
+            //printf("saving at step %zu\n", t);
             save_pos(E_field, output_matrix, num_saves++);
             // reset the timestep print counter
-            // will still decrement from loop def so add 1 here
+            // note that this will still decrement at the end of the loop
             steps_until_printout += TIMESTEP_SAVE;
         }
     }
