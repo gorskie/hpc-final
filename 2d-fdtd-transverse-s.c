@@ -2,15 +2,23 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
+
+#include "matrix.h"
+#include "util.h"
 
 #ifndef MESH_SIZE
 #define MESH_SIZE 60
 #endif
+#define MESH_SIZE_SQUARED MESH_SIZE*MESH_SIZE
 #ifndef NUM_TIMESTEPS
-#define NUM_TIMESTEPS 100
+#define NUM_TIMESTEPS 2000
+#endif
+#ifndef SAVE_EVERY_N_STEPS
+#define SAVE_EVERY_N_STEPS 2
 #endif
 #ifndef T0
-#define T0 20 // >= 2
+#define T0 20 // >= 2 This is how often the source is applied
 #endif
 #ifndef PULSE_SPREAD
 #define PULSE_SPREAD 6.f // gaussian
@@ -40,13 +48,23 @@
 #define MIN(X,Y) ((X)<(Y)?(X):(Y))
 #define MAX(X,Y) ((X)>(Y)?(X):(Y))
 
-int main() {
-	float ez[MESH_SIZE*MESH_SIZE] = {0}, hx[MESH_SIZE*MESH_SIZE] = {0}, hy[MESH_SIZE*MESH_SIZE] = {0};
+int main(int argc, const char *argv[]) {
+    // parse args
+    const char* output_loc;
+    if (argc > 1) {
+        output_loc = argv[1];
+    }
+    else {
+        output_loc = "./output.npy";
+    }
+    printf("%s\n", output_loc);
+	float ez[MESH_SIZE_SQUARED] = {0}, hx[MESH_SIZE_SQUARED] = {0}, hy[MESH_SIZE_SQUARED] = {0};
     float *ez_row, *hy_row, *hx_row;
+    Matrix *output = matrix_zeros(
+        (NUM_TIMESTEPS+SAVE_EVERY_N_STEPS-1)/SAVE_EVERY_N_STEPS,
+        MESH_SIZE*MESH_SIZE);
 
-	FILE* fp = fopen("2d_data.csv", "w");
-
-    for (int t = 0; t < NUM_TIMESTEPS; t++) {
+    for (int t = 0, steps_until_printout = SAVE_EVERY_N_STEPS; t < NUM_TIMESTEPS; t++) {
 
         /* --- MAIN FDTD LOOP --- */
         ez_row = ez; hy_row = hy; hx_row = hx;
@@ -58,12 +76,12 @@ int main() {
         }
 
         // pulse centered at PULSE_X, PULSE_Y with PULSE_WIDTH width and PULSE_SPREAD "height"
-        // peaks in intentsity at T0 and decays with time
+        // peaks in intensity at T0 and decays with time
         float pulse = (T0-t)*(1.f / PULSE_SPREAD);
         pulse = exp(-0.5f * pulse * pulse) * (2.f / PULSE_WIDTH);
         ez_row = ez+PULSE_Y*MESH_SIZE;
         for (int j = MAX(PULSE_X-PULSE_WIDTH/2, 0); j < MIN(PULSE_X+PULSE_WIDTH/2, MESH_SIZE); j++) {
-            ez_row[j] = pulse;
+            ez_row[j] += pulse;
         }
 
         /* --- boundary conditions --- */
@@ -71,6 +89,7 @@ int main() {
         memset(ez+MESH_SIZE*(MESH_SIZE-1), 0, MESH_SIZE*sizeof(float));
         for (int i = 1; i < MESH_SIZE-1; i++) { ez[i*MESH_SIZE] = ez[i*MESH_SIZE+MESH_SIZE-1] = 0.f; }
 
+        // Calculate magnetic field in the X
         ez_row = ez; hx_row = hx;
         for (int i = 0; i < MESH_SIZE-1; i++) {
             for (int j = 0; j < MESH_SIZE-1; j++) {
@@ -79,6 +98,7 @@ int main() {
             ez_row += MESH_SIZE; hx_row += MESH_SIZE;
         }
 
+        // Calculate magnetic field in the Y
         ez_row = ez; hy_row = hy;
         for (int i = 0; i < MESH_SIZE-1; i++) {
             for (int j = 0; j < MESH_SIZE-1; j++) {
@@ -87,15 +107,18 @@ int main() {
             ez_row += MESH_SIZE; hy_row += MESH_SIZE;
         }
 
-        /* --- MAIN FDTD LOOP --- */
-        
-        for (int i = 0; i < MESH_SIZE; i++) {
-            fprintf(fp, "%g", ez[i*MESH_SIZE]);
-            for (int j = 1; j < MESH_SIZE; j++) {
-                fprintf(fp, ",%g", ez[i*MESH_SIZE+j]);
-            }
-            fprintf(fp, "\n");
+        /* --- END OF MAIN FDTD LOOP --- */
+
+        if (--steps_until_printout == 0) {
+            printf("%d\n", t);
+            memcpy(output->data + t/SAVE_EVERY_N_STEPS*MESH_SIZE_SQUARED, ez, MESH_SIZE_SQUARED*sizeof(float));
+            steps_until_printout = SAVE_EVERY_N_STEPS;
         }
     }
-	fclose(fp);
+    // save results
+    matrix_to_npy_path(output_loc, output);
+    
+	//fclose(fp);
+    matrix_free(output);
+    return 0;
 }
