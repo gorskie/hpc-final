@@ -12,7 +12,7 @@
 #endif
 #define MESH_SIZE_SQUARED MESH_SIZE*MESH_SIZE
 #ifndef NUM_TIMESTEPS
-#define NUM_TIMESTEPS 2000
+#define NUM_TIMESTEPS 250
 #endif
 #ifndef SAVE_EVERY_N_STEPS
 #define SAVE_EVERY_N_STEPS 2
@@ -27,10 +27,10 @@
 #define PULSE_WIDTH 40
 #endif
 #ifndef PULSE_Y
-#define PULSE_Y 2
+#define PULSE_Y 2 // apply slightly below the boundary
 #endif
 #ifndef PULSE_X
-#define PULSE_X MESH_SIZE/2
+#define PULSE_X MESH_SIZE/2 // apply in middle of the mesh
 #endif
 #ifndef CELL_SIZE
 #define CELL_SIZE 3e8f
