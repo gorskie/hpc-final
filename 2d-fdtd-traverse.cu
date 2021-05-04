@@ -1,5 +1,5 @@
 /**
- * Proof of concept for the 1 dimensional FDTD simulation of EM waves
+ * Proof of concept for the 2 dimensional FDTD simulation of EM waves
  * 
  * To compile the program:
  * gcc -Wall -O3 -march=native -c matrix.c util.c   # only need to run once
@@ -76,7 +76,8 @@ void main_device(float* ez_row, float* hy_row, float* hx_row) {
 
 int main() {
     size_t nbytes = MESH_SIZE*MESH_SIZE;
-	float ez[nbytes] = {0}, hx[nbytes] = {0}, hy[nbytes] = {0};
+	float ez[nbytes], hx[nbytes], hy[nbytes];
+    memset(ez, 0, nbytes); memset(hx, 0, nbytes); memset(hy, 0, nbytes);
     float *ez_row, *hy_row, *hx_row;
     float *d_ez_row, *d_hy_row, *d_hx_row;
 
@@ -84,16 +85,7 @@ int main() {
     CHECK(cudaMalloc(&d_hy_row, nbytes));
     CHECK(cudaMalloc(&d_hx_row, nbytes));
 
-    CHECK(cudaMemcpy(d_ez_row, ez_row, nbytes, cudaMemcpyHostToDevice));
-    CHECK(cudaMemcpy(d_hy_row, hy_row, nbytes, cudaMemcpyHostToDevice));
-    CHECK(cudaMemcpy(d_hx_row, hx_row, nbytes, cudaMemcpyHostToDevice));
-
-    const int n_block_size = 32;
-    const int m_block_size = 32;
-    dim3 grid((MESH_SIZE + n_block_size - 1) / n_block_size, (MESH_SIZE + m_block_size - 1) / m_block_size);
-    dim3 block(n_block_size, m_block_size);
-
-	FILE* fp = fopen("2d_data.csv", "w");
+    FILE* fp = fopen("2d_data.csv", "w");
 
     for (int t = 0; t < NUM_TIMESTEPS; t++) {
 
@@ -120,6 +112,15 @@ int main() {
         memset(ez+MESH_SIZE*(MESH_SIZE-1), 0, MESH_SIZE*sizeof(float));
         for (int i = 1; i < MESH_SIZE-1; i++) { ez[i*MESH_SIZE] = ez[i*MESH_SIZE+MESH_SIZE-1] = 0.f; }
 
+        CHECK(cudaMemcpy(d_ez_row, ez_row, nbytes, cudaMemcpyHostToDevice));
+        CHECK(cudaMemcpy(d_hy_row, hy_row, nbytes, cudaMemcpyHostToDevice));
+        CHECK(cudaMemcpy(d_hx_row, hx_row, nbytes, cudaMemcpyHostToDevice));
+    
+        const int n_block_size = 32;
+        const int m_block_size = 32;
+        dim3 grid((MESH_SIZE + n_block_size - 1) / n_block_size, (MESH_SIZE + m_block_size - 1) / m_block_size);
+        dim3 block(n_block_size, m_block_size);
+    
         main_device<<<grid, block>>>(d_ez_row, d_hy_row, d_hx_row);
 
         CHECK(cudaMemcpy(ez_row, d_ez_row, nbytes, cudaMemcpyDeviceToHost));
