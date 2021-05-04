@@ -1,3 +1,14 @@
+/**
+ * Proof of concept for the 1 dimensional FDTD simulation of EM waves
+ * 
+ * To compile the program:
+ * gcc -Wall -O3 -march=native -c matrix.c util.c   # only need to run once
+ * nvcc -arch=sm_20 -O3 *.cu *.o -o 2d-fdtd-transvers-cuda -lm
+ * 
+ * To run the program:
+ *  ./2d-fdtd-transvers-cuda output.npy
+ */
+
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
