@@ -1,13 +1,13 @@
 /**
- * To compile:  gcc -Wall -g -O3 2d-fdtd-additive-s.c matrix.c util.c -o 2d-fdtd-additive-s -lm
- * To run: ./2d-fdtd-additive-s
+ * To compile:  gcc -Wall -g -O3 -fopenmp 2d-fdtd-additive-p.c matrix.c util.c -o 2d-fdtd-additive-p -lm
+ * To run: ./2d-fdtd-additive-p
 **/
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
-
+#include <omp.h>
 #include "matrix.h"
 #include "util.h"
 
@@ -73,10 +73,14 @@ int main(int argc, const char *argv[]) {
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
 
+    // CHECK: this correct?
+    #pragma omp parallel
     for (int t = 0, steps_until_printout = SAVE_EVERY_N_STEPS; t < NUM_TIMESTEPS; t++) {
 
         /* --- MAIN FDTD LOOP --- */
+        // TODO: check if need loop fusion
         ez_row = ez; hy_row = hy; hx_row = hx;
+        #pragma omp for
         for (int i = 1; i < MESH_SIZE; i++) {
             ez_row += MESH_SIZE; hy_row += MESH_SIZE; hx_row += MESH_SIZE;
             for (int j = 1; j < MESH_SIZE; j++) {
@@ -89,32 +93,16 @@ int main(int argc, const char *argv[]) {
         float pulse = 1.f / PULSE_SPREAD;
         pulse = exp(-0.5f * pulse * pulse) * (2.f / PULSE_WIDTH);
         ez_row = ez+PULSE_Y*MESH_SIZE;
+        #pragma omp for
         for (int j = MAX(PULSE_X-PULSE_WIDTH/2, 0); j < MIN(PULSE_X+PULSE_WIDTH/2, MESH_SIZE); j++) {
             ez_row[j] += pulse;
         }
-
-        /*
-        // Calculate magnetic field in the X
-        ez_row = ez; hx_row = hx;
-        for (int i = 0; i < MESH_SIZE-1; i++) {
-            for (int j = 0; j < MESH_SIZE-1; j++) {
-                hx_row[j] += CC*(ez_row[j] - ez_row[j+1]);
-            }
-            ez_row += MESH_SIZE; hx_row += MESH_SIZE;
-        }
-
-        // Calculate magnetic field in the Y
-        ez_row = ez; hy_row = hy;
-        for (int i = 0; i < MESH_SIZE-1; i++) {
-            for (int j = 0; j < MESH_SIZE-1; j++) {
-                hy_row[j] += CC*(ez_row[MESH_SIZE+j] - ez_row[j]);
-            }
-            ez_row += MESH_SIZE; hy_row += MESH_SIZE;
-        }
-        */
+        
+        // TODO: loop fission
         // Calculate magnetic field in the X
         // Calculate magnetic field in the Y
         ez_row = ez; hy_row = hy; hx_row = hx;
+        #pragma omp for
         for (int i = 1; i < MESH_SIZE-1; i++) {
             for (int j = 1; j < MESH_SIZE-1; j++) {
                 hx_row[j] += CC*(ez_row[j] - ez_row[j+1]);
