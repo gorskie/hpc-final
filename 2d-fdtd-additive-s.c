@@ -64,7 +64,6 @@ int main(int argc, const char *argv[]) {
     float* ez = (float*)malloc(MESH_SIZE_SQUARED*sizeof(float));
     float* hx = (float*)malloc(MESH_SIZE_SQUARED*sizeof(float));
     float* hy = (float*)malloc(MESH_SIZE_SQUARED*sizeof(float));
-	//float ez[MESH_SIZE_SQUARED] = {0}, hx[MESH_SIZE_SQUARED] = {0}, hy[MESH_SIZE_SQUARED] = {0};
     float *ez_row, *hy_row, *hx_row;
     Matrix *output = matrix_zeros(
         (NUM_TIMESTEPS+SAVE_EVERY_N_STEPS-1)/SAVE_EVERY_N_STEPS,
@@ -94,11 +93,7 @@ int main(int argc, const char *argv[]) {
             ez_row[j] += pulse;
         }
 
-        /* --- boundary conditions --- */
-        memset(ez, 0, MESH_SIZE*sizeof(float));
-        memset(ez+MESH_SIZE*(MESH_SIZE-1), 0, MESH_SIZE*sizeof(float));
-        for (int i = 1; i < MESH_SIZE-1; i++) { ez[i*MESH_SIZE] = ez[i*MESH_SIZE+MESH_SIZE-1] = 0.f; }
-
+        /*
         // Calculate magnetic field in the X
         ez_row = ez; hx_row = hx;
         for (int i = 0; i < MESH_SIZE-1; i++) {
@@ -116,6 +111,17 @@ int main(int argc, const char *argv[]) {
             }
             ez_row += MESH_SIZE; hy_row += MESH_SIZE;
         }
+        */
+        // Calculate magnetic field in the X
+        // Calculate magnetic field in the Y
+        ez_row = ez; hy_row = hy; hx_row = hx;
+        for (int i = 1; i < MESH_SIZE-1; i++) {
+            for (int j = 1; j < MESH_SIZE-1; j++) {
+                hx_row[j] += CC*(ez_row[j] - ez_row[j+1]);
+                hy_row[j] += CC*(ez_row[MESH_SIZE+j] - ez_row[j]);
+            }
+            ez_row += MESH_SIZE; hy_row += MESH_SIZE; hx_row += MESH_SIZE;
+        }
 
         /* --- END OF MAIN FDTD LOOP --- */
 
@@ -127,11 +133,11 @@ int main(int argc, const char *argv[]) {
     // get the end and computation time
     clock_gettime(CLOCK_MONOTONIC, &end);
     double time = get_time_diff(&start, &end);
-    printf("%f secs\n", time);
+    printf("%f\n", time);
 
     // save results
     matrix_to_npy_path(output_loc, output);
-    
+    // cleanup
     free(ez);
     free(hx);
     free(hy);
