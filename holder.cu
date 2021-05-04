@@ -10,14 +10,14 @@
 #include "util.h"
 
 #ifndef MESH_SIZE
-#define MESH_SIZE 100
+#define MESH_SIZE 2000
 #endif
 #define MESH_SIZE_SQUARED MESH_SIZE*MESH_SIZE
 #ifndef NUM_TIMESTEPS
 #define NUM_TIMESTEPS 100
 #endif
 #ifndef SAVE_EVERY_N_STEPS
-#define SAVE_EVERY_N_STEPS 5
+#define SAVE_EVERY_N_STEPS 2
 #endif
 #ifndef T0
 #define T0 20 // >= 2 This is the peak of when the source is applied
@@ -46,11 +46,8 @@
 #ifndef CC
 #define CC CELL_SIZE*DT/DZ // 0.5f unless DT is not the derived value that it is
 #endif
-#ifndef N_BLOCK_SIZE
-#define N_BLOCK_SIZE 32
-#endif
-#ifndef M_BLOCK_SIZE
-#define M_BLOCK_SIZE 32
+#ifndef BLOCK_SIZE
+#define BLOCK_SIZE 1024
 #endif
 
 #define MIN(X,Y) ((X)<(Y)?(X):(Y))
@@ -69,48 +66,51 @@
 
 __global__
 void main_device(float* ez, float* hy, float* hx, float* output) {
-    unsigned int i = blockIdx.x * blockDim.x + threadIdx.x;
-    unsigned int j = blockIdx.y * blockDim.y + threadIdx.y;
+    unsigned int i0 = threadIdx.x;
+    int steps_until_printout = SAVE_EVERY_N_STEPS;
 
-    //cooperative_groups::grid_group grid = cooperative_groups::this_grid();
-
-    float* my_ez = &ez[i*MESH_SIZE + j];
-    float* my_hy = &hy[i*MESH_SIZE + j];
-    float* my_hx = &hx[i*MESH_SIZE + j];
-    my_ez[0] = 0;
-    my_hy[0] = 0;
-    my_hx[0] = 0;
-
-    if (1 <= i && i < MESH_SIZE && 1 <= j && j < MESH_SIZE) {
-        for (int t = 0, steps_until_printout = SAVE_EVERY_N_STEPS; t < NUM_TIMESTEPS; t++) {
-            
-            __syncthreads();
-
+    for (int t = 0; t < NUM_TIMESTEPS; t++) {
+        for (unsigned int i = i0; i < MESH_SIZE*MESH_SIZE; i += blockDim.x) {
+            unsigned int x = i % MESH_SIZE, y = i / MESH_SIZE;
+            if (x == 0 || y == 0 || x == MESH_SIZE - 1 || y == MESH_SIZE - 1) { continue; }
+            float* my_ez = &ez[y*MESH_SIZE + x];
+            float* my_hy = &hy[y*MESH_SIZE + x];
+            float* my_hx = &hx[y*MESH_SIZE + x];
+        
             /* --- MAIN FDTD LOOP --- */
             my_ez[0] += CC*(my_hy[0] - my_hy[-MESH_SIZE] - my_hx[0] + my_hx[-1]);
 
             // pulse centered at PULSE_X, PULSE_Y with PULSE_WIDTH width and PULSE_SPREAD "height"
             // peaks in intensity at T0 and decays with time
-            if (i = PULSE_Y && j >= MAX(PULSE_X-PULSE_WIDTH/2, 0) && j < MIN(PULSE_X+PULSE_WIDTH/2, MESH_SIZE)) {
+            if (y == PULSE_Y && x >= MAX(PULSE_X-PULSE_WIDTH/2, 0) && x < MIN(PULSE_X+PULSE_WIDTH/2, MESH_SIZE)) {
                 float pulse = (T0-t)*(1.f / PULSE_SPREAD);
                 pulse = exp(-0.5f * pulse * pulse) * (2.f / PULSE_WIDTH);
                 my_ez[0] += pulse;
             }
+        }
 
-            __syncthreads();
+        __syncthreads();
 
-            // Calculate magnetic field in the X
+        bool printout = --steps_until_printout == 0;
+        for (unsigned int i = i0; i < (MESH_SIZE-2)*(MESH_SIZE-2); i += blockDim.x) {
+            unsigned int x = i % MESH_SIZE, y = i / MESH_SIZE;
+            if (x == 0 || y == 0 || x == MESH_SIZE - 1 || y == MESH_SIZE - 1) { continue; }
+            float* my_ez = &ez[y*MESH_SIZE + x];
+            float* my_hy = &hy[y*MESH_SIZE + x];
+            float* my_hx = &hx[y*MESH_SIZE + x];
+
+            // Calculate magnetic field in the X/Y
             my_hx[0] += CC*(my_ez[0] - my_ez[1]);
-
-            // Calculate magnetic field in the Y
             my_hy[0] += CC*(my_ez[MESH_SIZE] - my_ez[0]);
 
             /* --- END OF MAIN FDTD LOOP --- */
-            if (--steps_until_printout == 0) {
-                output[t/SAVE_EVERY_N_STEPS*MESH_SIZE_SQUARED + i*MESH_SIZE + j] = my_ez[0];
-                steps_until_printout = SAVE_EVERY_N_STEPS;
+            if (printout) {
+                output[t/SAVE_EVERY_N_STEPS*MESH_SIZE_SQUARED + y*MESH_SIZE + x] = my_ez[0];
             }
         }
+        if (printout) { steps_until_printout = SAVE_EVERY_N_STEPS; }
+
+        __syncthreads();
     }
 }
 
@@ -122,28 +122,32 @@ int main(int argc, const char *argv[]) {
     }
 
     const size_t num_elems = MESH_SIZE*MESH_SIZE, nbytes = num_elems * sizeof(float);
-	float ez[num_elems], hx[num_elems], hy[num_elems];
-    memset(ez, 0, nbytes); memset(hx, 0, nbytes); memset(hy, 0, nbytes);
     float *d_ez, *d_hy, *d_hx, *d_output;
     const size_t num_outputs = (NUM_TIMESTEPS+SAVE_EVERY_N_STEPS-1)/SAVE_EVERY_N_STEPS;
     Matrix *output = matrix_create_raw(num_outputs, num_elems);
-    cudaStream_t cuda_stream;
-    CHECK(cudaStreamCreate(&cuda_stream));
 
     CHECK(cudaMalloc(&d_ez, nbytes));
     CHECK(cudaMalloc(&d_hy, nbytes));
     CHECK(cudaMalloc(&d_hx, nbytes));
     CHECK(cudaMalloc(&d_output, nbytes*num_outputs));
+    CHECK(cudaMemset(d_ez, 0, nbytes));
+    CHECK(cudaMemset(d_hy, 0, nbytes));
+    CHECK(cudaMemset(d_hx, 0, nbytes));
+    CHECK(cudaMemset(d_output, 0, nbytes*num_outputs));
+    // start the clock
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
 
-    dim3 grid((MESH_SIZE + N_BLOCK_SIZE - 1) / N_BLOCK_SIZE,
-              (MESH_SIZE + M_BLOCK_SIZE - 1) / M_BLOCK_SIZE);
-    dim3 block(N_BLOCK_SIZE, M_BLOCK_SIZE);
-    main_device<<<grid, block>>>(d_ez, d_hy, d_hx, d_output);
-    void* args[] = {&d_ez, &d_hx, &d_hy, &d_output};
+    main_device<<<1, BLOCK_SIZE>>>(d_ez, d_hy, d_hx, d_output);
     CHECK(cudaDeviceSynchronize());
 
-    CHECK(cudaMemcpy(output->data, d_output, num_outputs, cudaMemcpyDeviceToHost));
-    
+    // get the end and computation time
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    double time = get_time_diff(&start, &end);
+    printf("%f secs\n", time);
+
+    CHECK(cudaMemcpy(output->data, d_output, num_outputs*nbytes, cudaMemcpyDeviceToHost));
+
     // save results
     matrix_to_npy_path(output_loc, output);
     
