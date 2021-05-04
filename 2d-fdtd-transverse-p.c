@@ -63,15 +63,13 @@ int main(int argc, const char *argv[]) {
         output_loc = argv[1];
     }
     else {
-        output_loc = "./output.npy";
+        output_loc = "./output-fdtd-2d-transverse-p.npy";
     }
-    printf("%s\n", output_loc);
 	float ez[MESH_SIZE_SQUARED] = {0}, hx[MESH_SIZE_SQUARED] = {0}, hy[MESH_SIZE_SQUARED] = {0};
     float *ez_row, *hy_row, *hx_row;
     Matrix *output = matrix_zeros(
         (NUM_TIMESTEPS+SAVE_EVERY_N_STEPS-1)/SAVE_EVERY_N_STEPS,
         MESH_SIZE*MESH_SIZE);
-
     
     // start the clock
     struct timespec start, end;

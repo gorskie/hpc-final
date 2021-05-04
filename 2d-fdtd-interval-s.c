@@ -68,6 +68,11 @@ int main(int argc, const char *argv[]) {
         (NUM_TIMESTEPS+SAVE_EVERY_N_STEPS-1)/SAVE_EVERY_N_STEPS,
         MESH_SIZE*MESH_SIZE);
 
+    // start the clock
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+
     for (int t = 0, steps_until_printout = SAVE_EVERY_N_STEPS; t < NUM_TIMESTEPS; t++) {
 
         /* --- MAIN FDTD LOOP --- */
@@ -120,6 +125,11 @@ int main(int argc, const char *argv[]) {
             steps_until_printout = SAVE_EVERY_N_STEPS;
         }
     }
+    // get the end and computation time
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    double time = get_time_diff(&start, &end);
+    printf("%f secs\n", time);
+
     // save results
     matrix_to_npy_path(output_loc, output);
     
