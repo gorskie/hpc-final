@@ -59,7 +59,6 @@ void main_device(float* ez_row, float* hy_row, float* hx_row) {
 
     ez_row += ix*MESH_SIZE; hy_row += ix*MESH_SIZE; hx_row += ix*MESH_SIZE;
 
-    ez_row[iy] += CC*(hy_row[iy] - hy_row[iy-MESH_SIZE] - hx_row[iy] + hx_row[iy-1])
     hx_row[iy] += CC*(ez_row[iy] - ez_row[iy+1]);
     hy_row[iy] += CC*(ez_row[MESH_SIZE+iy] - ez_row[iy]);
 }
@@ -80,7 +79,7 @@ int main() {
 
     const int n_block_size = 32;
     const int m_block_size = 32;
-    dim3 grid((n + n_block_size - 1) / n_block_size, (m + m_block_size - 1) / m_block_size);
+    dim3 grid((MESH_SIZE + n_block_size - 1) / n_block_size, (MESH_SIZE + m_block_size - 1) / m_block_size);
     dim3 block(n_block_size, m_block_size);
 
 	FILE* fp = fopen("2d_data.csv", "w");
@@ -95,7 +94,6 @@ int main() {
                 ez_row[j] += CC*(hy_row[j] - hy_row[j-MESH_SIZE] - hx_row[j] + hx_row[j-1]);
             }
         }
-        main_device<<<grid, block>>>(d_ez_row, d_hy_row, d_hx_row);
 
         // pulse centered at PULSE_X, PULSE_Y with PULSE_WIDTH width and PULSE_SPREAD "height"
         // peaks in intentsity at T0 and decays with time
@@ -111,21 +109,8 @@ int main() {
         memset(ez+MESH_SIZE*(MESH_SIZE-1), 0, MESH_SIZE*sizeof(float));
         for (int i = 1; i < MESH_SIZE-1; i++) { ez[i*MESH_SIZE] = ez[i*MESH_SIZE+MESH_SIZE-1] = 0.f; }
 
-        ez_row = ez; hx_row = hx;
-        for (int i = 0; i < MESH_SIZE-1; i++) {
-            for (int j = 0; j < MESH_SIZE-1; j++) {
-                hx_row[j] += CC*(ez_row[j] - ez_row[j+1]);
-            }
-            ez_row += MESH_SIZE; hx_row += MESH_SIZE;
-        }
+        main_device<<<grid, block>>>(d_ez_row, d_hy_row, d_hx_row);
 
-        ez_row = ez; hy_row = hy;
-        for (int i = 0; i < MESH_SIZE-1; i++) {
-            for (int j = 0; j < MESH_SIZE-1; j++) {
-                hy_row[j] += CC*(ez_row[MESH_SIZE+j] - ez_row[j]);
-            }
-            ez_row += MESH_SIZE; hy_row += MESH_SIZE;
-        }
         CHECK(cudaMemcpy(ez_row, d_ez_row, nbytes, cudaMemcpyDeviceToHost));
         CHECK(cudaMemcpy(hy_row, d_hy_row, nbytes, cudaMemcpyDeviceToHost));
         CHECK(cudaMemcpy(hx_row, d_hx_row, nbytes, cudaMemcpyDeviceToHost));
@@ -142,6 +127,6 @@ int main() {
         }
     }
     CHECK(cudaDeviceReset());
-    CHECK(cudaFree(d_ez_row)); CHECK(cudaFree(d_hy_row); CHECK(cudaFree(d_hx_row));
+    CHECK(cudaFree(d_ez_row)); CHECK(cudaFree(d_hy_row)); CHECK(cudaFree(d_hx_row));
 	fclose(fp);
 }
