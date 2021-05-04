@@ -59,7 +59,7 @@ int main(int argc, const char *argv[]) {
         output_loc = argv[1];
     }
     else {
-        output_loc = "./output-fdtd-2d-interval.npy";
+        output_loc = "./output-fdtd-2d-interval-s.npy";
     }
 
 	float ez[MESH_SIZE_SQUARED] = {0}, hx[MESH_SIZE_SQUARED] = {0}, hy[MESH_SIZE_SQUARED] = {0};
