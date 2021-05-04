@@ -61,7 +61,10 @@ int main(int argc, const char *argv[]) {
     else {
         output_loc = "./output-fdtd-2d-additive-s.npy";
     }
-	float ez[MESH_SIZE_SQUARED] = {0}, hx[MESH_SIZE_SQUARED] = {0}, hy[MESH_SIZE_SQUARED] = {0};
+    float* ez = (float*)malloc(MESH_SIZE_SQUARED*sizeof(float));
+    float* hx = (float*)malloc(MESH_SIZE_SQUARED*sizeof(float));
+    float* hy = (float*)malloc(MESH_SIZE_SQUARED*sizeof(float));
+	//float ez[MESH_SIZE_SQUARED] = {0}, hx[MESH_SIZE_SQUARED] = {0}, hy[MESH_SIZE_SQUARED] = {0};
     float *ez_row, *hy_row, *hx_row;
     Matrix *output = matrix_zeros(
         (NUM_TIMESTEPS+SAVE_EVERY_N_STEPS-1)/SAVE_EVERY_N_STEPS,
@@ -129,6 +132,9 @@ int main(int argc, const char *argv[]) {
     // save results
     matrix_to_npy_path(output_loc, output);
     
+    free(ez);
+    free(hx);
+    free(hy);
     matrix_free(output);
     return 0;
 }
