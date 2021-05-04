@@ -1,9 +1,16 @@
 import numpy as npy
 import matplotlib.pyplot as plt
+import argparse
 
-grid_size = (60, 60)
+parser = argparse.ArgumentParser(description='Process some integers.')
+parser.add_argument('size', metavar='n', type=int, default=60,
+                    help='size of the square mesh (default 60)')
+parser.add_argument('fname', metavar='f', type=str)
 
-m = npy.load('output-2d-s.npy')
+args = parser.parse_args()
+grid_size = (args.size, args.size)
+
+m = npy.load('output-fdtd-2d-{}.npy'.format(args.fname))
 m = m.reshape(-1, *grid_size)
 
 x = abs(m).max()

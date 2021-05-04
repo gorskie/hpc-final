@@ -1,3 +1,7 @@
+/**
+ * To compile: gcc -Wall -g -O3 -march=native 2d-fdtd-interval-s.c matrix.c util.c -o 2d-fdtd-interval-s -lm
+ * To run: ./2d-fdtd-interval
+**/
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -12,13 +16,13 @@
 #endif
 #define MESH_SIZE_SQUARED MESH_SIZE*MESH_SIZE
 #ifndef NUM_TIMESTEPS
-#define NUM_TIMESTEPS 100
+#define NUM_TIMESTEPS 500
 #endif
 #ifndef SAVE_EVERY_N_STEPS
 #define SAVE_EVERY_N_STEPS 5
 #endif
 #ifndef T0
-#define T0 20 // >= 2 This is the peak of when the source is applied
+#define T0 20 // >= 2 This is how often the source is applied
 #endif
 #ifndef PULSE_SPREAD
 #define PULSE_SPREAD 6.f // gaussian
@@ -55,7 +59,7 @@ int main(int argc, const char *argv[]) {
         output_loc = argv[1];
     }
     else {
-        output_loc = "./output-fdtd-2d-transverse.npy";
+        output_loc = "./output-fdtd-2d-interval.npy";
     }
 
 	float ez[MESH_SIZE_SQUARED] = {0}, hx[MESH_SIZE_SQUARED] = {0}, hy[MESH_SIZE_SQUARED] = {0};
@@ -76,12 +80,14 @@ int main(int argc, const char *argv[]) {
         }
 
         // pulse centered at PULSE_X, PULSE_Y with PULSE_WIDTH width and PULSE_SPREAD "height"
-        // peaks in intensity at T0 and decays with time
-        float pulse = (T0-t)*(1.f / PULSE_SPREAD);
-        pulse = exp(-0.5f * pulse * pulse) * (2.f / PULSE_WIDTH);
-        ez_row = ez+PULSE_Y*MESH_SIZE;
-        for (int j = MAX(PULSE_X-PULSE_WIDTH/2, 0); j < MIN(PULSE_X+PULSE_WIDTH/2, MESH_SIZE); j++) {
-            ez_row[j] += pulse;
+        // adds pulse every T0 timesteps at a constant intensity
+        if (t%T0==0) {
+            float pulse = 1.f / PULSE_SPREAD;
+            pulse = exp(-0.5f * pulse * pulse) * (2.f / PULSE_WIDTH);
+            ez_row = ez+PULSE_Y*MESH_SIZE;
+            for (int j = MAX(PULSE_X-PULSE_WIDTH/2, 0); j < MIN(PULSE_X+PULSE_WIDTH/2, MESH_SIZE); j++) {
+                ez_row[j] += pulse;
+            }
         }
 
         /* --- boundary conditions --- */
