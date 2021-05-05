@@ -17,10 +17,10 @@
 #endif
 #define MESH_SIZE_SQUARED MESH_SIZE*MESH_SIZE
 #ifndef NUM_TIMESTEPS
-#define NUM_TIMESTEPS 500
+#define NUM_TIMESTEPS 5000
 #endif
 #ifndef SAVE_EVERY_N_STEPS
-#define SAVE_EVERY_N_STEPS 10
+#define SAVE_EVERY_N_STEPS 50
 #endif
 #ifndef T0
 #define T0 20 // >= 2
@@ -147,7 +147,7 @@ int main(int argc, const char *argv[]) {
     // get the end and computation time
     clock_gettime(CLOCK_MONOTONIC, &end);
     double time = get_time_diff(&start, &end);
-    printf("%f secs\n", time);
+    printf("%f\n", time);
 
     CHECK(cudaMemcpy(output->data, d_output, num_outputs*nbytes, cudaMemcpyDeviceToHost));
 
