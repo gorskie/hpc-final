@@ -2,6 +2,8 @@
 #SBATCH -p gpu-shared
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=10
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
 #SBATCH --mem=95G
 #SBATCH -t 01:00:00
 #SBATCH -A mor100
@@ -29,9 +31,9 @@ SFILE="$SCRATCH/$FILE"
 
 echo "additive serial"
 
-for n in 100 500 1000 5000 10000 500000; do
+gcc -Wall -O3 -march=native -c matrix.c util.c
+for n in 100 200 300 400 500 600 700 800 900 1000 2000 3000 4000 5000 6000 7000 8000 9000; do
     echo $n
-    gcc -Wall -O3 -march=native -c matrix.c util.c
     nvcc -arch=sm_20 -O3 $SFILE *.o -o $SCRATCH/2d-fdtd-additive-cuda -lm -DMESH_SIZE=$n -DNUM_TIMESTEPS=500 -DSAVE_EVERY_N_STEPS=5
     FNAME="output-fdtd-2d-additive-cuda-$n.npy"
     "$SCRATCH/2d-fdtd-additive-cuda" "$FNAME"
