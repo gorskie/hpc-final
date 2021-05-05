@@ -54,13 +54,17 @@
 
 int main(int argc, const char *argv[]) {
     // parse args
-    const char* output_loc;
-    if (argc > 1) {
-        output_loc = argv[1];
+    const char* output_loc = "./output-fdtd-2d-additive-p.npy";
+    size_t num_threads = 4;
+
+    if(argc > 1) {
+        num_threads = argv[1];
     }
-    else {
-        output_loc = "./output-fdtd-2d-additive-s.npy";
+    if (argc > 2) {
+        output_loc = argv[2];
     }
+
+
     float* ez = (float*)malloc(MESH_SIZE_SQUARED*sizeof(float));
     float* hx = (float*)malloc(MESH_SIZE_SQUARED*sizeof(float));
     float* hy = (float*)malloc(MESH_SIZE_SQUARED*sizeof(float));
@@ -74,7 +78,7 @@ int main(int argc, const char *argv[]) {
     clock_gettime(CLOCK_MONOTONIC, &start);
 
     // CHECK: this correct?
-    #pragma omp parallel
+    #pragma omp parallel num_thread(num_threads)
     for (int t = 0, steps_until_printout = SAVE_EVERY_N_STEPS; t < NUM_TIMESTEPS; t++) {
 
         /* --- MAIN FDTD LOOP --- */
