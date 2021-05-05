@@ -30,8 +30,8 @@ for n in 100 500 1000; do # 5000 10000 500000; do
     echo $n
     gcc -Wall -g -O3 -march=native $SFILE matrix.c util.c -o $SCRATCH/2d-fdtd-additive-p -lm -DMESH_SIZE=$n -DNUM_TIMESTEPS=500 -DSAVE_EVERY_N_STEPS=5
     FNAME="output-fdtd-2d-additive-p-$n.npy"
-    "$SCRATCH/2d-fdtd-additive-p" "$FNAME" # & means to background the process
-    "$SCRATCH/2d-fdtd-additive-p" "$FNAME"
-    "$SCRATCH/2d-fdtd-additive-p" "$FNAME"
+    "$SCRATCH/2d-fdtd-additive-p" "$NUM_THREADS" "$FNAME"
+    "$SCRATCH/2d-fdtd-additive-p" "$NUM_THREADS" "$FNAME"
+    "$SCRATCH/2d-fdtd-additive-p" "$NUM_THREADS" "$FNAME"
 done
 
