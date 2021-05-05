@@ -78,7 +78,7 @@ int main(int argc, const char *argv[]) {
     clock_gettime(CLOCK_MONOTONIC, &start);
 
     // CHECK: this correct?
-    #pragma omp parallel num_thread(num_threads)
+    #pragma omp parallel num_threads(num_threads)
     for (int t = 0, steps_until_printout = SAVE_EVERY_N_STEPS; t < NUM_TIMESTEPS; t++) {
 
         /* --- MAIN FDTD LOOP --- */
