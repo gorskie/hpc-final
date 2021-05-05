@@ -26,7 +26,7 @@ SFILE="$SCRATCH/$FILE"
 
 echo "additive serial"
 
-for n in 100 500 1000; do # 5000 10000 500000; do
+for n in 100 500 1000 5000 10000 500000; do
     echo $n
     gcc -Wall -g -O3 -march=native $SFILE matrix.c util.c -o $SCRATCH/2d-fdtd-additive-p -lm -DMESH_SIZE=$n -DNUM_TIMESTEPS=500 -DSAVE_EVERY_N_STEPS=5
     FNAME="output-fdtd-2d-additive-p-$n.npy"
